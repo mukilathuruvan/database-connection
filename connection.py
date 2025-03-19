@@ -8,9 +8,9 @@ class Connection:
         self.password = password
         self.database = database
 
-    def execute_sql_alchemy(host, user, password, database, query, values=None):
+    def execute(query, values=None):
         try:
-            engine_str = f"mysql+pymysql://{user}:{password}@{host}/{database}"
+            engine_str = f"mysql+pymysql://{self.user}:{self.password}@{self.host}/{self.database}"
             engine = create_engine(engine_str)
 
             with engine.connect() as connection:
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     connection = Connection(host, user, password, database)
 
     query = ""
-    results = execute_sql_alchemy(host, user, password, database, query)
+    results = connection.execute(query)
 
     if results:
         for row in results:
