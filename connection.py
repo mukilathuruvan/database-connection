@@ -1,77 +1,45 @@
-import mysql.connector
+from sqlalchemy import create_engine, text
 
 
-class MySQLDatabase:
-
-    def __init__(self, host="localhost", user="", password="", database=""):
+class Connection:
+    def __init__(self, host, user, password, database):
         self.host = host
         self.user = user
         self.password = password
         self.database = database
-        self.connection = None
-        self.connect()
 
-    def connect(self):
+    def execute_sql_alchemy(host, user, password, database, query, values=None):
         try:
-            if self.database:
-                self.connection = mysql.connector.connect(
-                    host=self.host,
-                    user=self.user,
-                    password=self.password,
-                    database=self.database,
-                )
-            else:
-                self.connection = mysql.connector.connect(
-                    host=self.host,
-                    user=self.user,
-                    password=self.password,
-                )
-            print("Connection to MySQL successful!")
-            return True
+            engine_str = f"mysql+pymysql://{user}:{password}@{host}/{database}"
+            engine = create_engine(engine_str)
 
-        except mysql.connector.Error as err:
-            print(f"Error connecting to MySQL: {err}")
-            return False
+            with engine.connect() as connection:
+                result = connection.execute(text(query), values)
 
-    def execute_query(self, query, values=None):
-        if self.connection is None or not self.connection.is_connected():
-            self.connect()
+                if result.returns_rows:
+                    return [dict(row) for row in result.mappings()]
+                else:
+                    connection.commit()
+                    return None
+
+        except Exception as e:
+            print(f"Error executing SQLAlchemy query: {e}")
             return None
 
-        cursor = self.connection.cursor()
-        try:
-            if values:
-                cursor.execute(query, values)
-            else:
-                cursor.execute(query)
 
-            if cursor.description:
-                results = cursor.fetchall()
-                self.connection.commit()
-                return results
-            else:
-                self.connection.commit()
-                return None
-
-        except mysql.connector.Error as err:
-            print(f"Error executing query: {err}")
-            self.connection.rollback()
-            return None
-        finally:
-            cursor.close()
-
-    def close(self):
-        """
-        Closes the MySQL connection.
-        """
-        if self.connection and self.connection.is_connected():
-            self.connection.close()
-            print("MySQL connection closed.")
-            self.connection = None  # Reset connection attribute
-
-
-# Example usage:
 if __name__ == "__main__":
-    # Create an instance of MySQLDatabase
-    db = MySQLDatabase(host="localhost", user="root", password="", database="")
-    db.execute_query("SELECT * FROM users")
+    host = "your_host"
+    user = "your_user"
+    password = "your_password"
+    database = "your_database"
+
+    connection = Connection(host, user, password, database)
+
+    query = ""
+    results = execute_sql_alchemy(host, user, password, database, query)
+
+    if results:
+        for row in results:
+            print(row)
+    else:
+        print("No results found or an error occurred.")
