@@ -1,49 +1,78 @@
-from sqlalchemy import create_engine, text
+import psycopg2
 
 
-class Connection:
+class PostgresConnection:
     def __init__(self, host, user, password, database, port=5432):
         self.host = host
         self.user = user
         self.password = password
         self.database = database
         self.port = port
+        self.connection = None
+
+    def connect(self):
+        try:
+            self.connection = psycopg2.connect(
+                host=self.host,
+                user=self.user,
+                password=self.password,
+                database=self.database,
+                port=self.port,
+            )
+            return True
+        except psycopg2.Error as e:
+            print(f"Error connecting to PostgreSQL: {e}")
+            return False
 
     def execute(self, query, values=None):
+        if self.connection is None:
+            print("Connection not established.")
+            return None
+
         try:
-            engine_str = f"postgresql+psycopg2://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"  # changed engine string
-            engine = create_engine(engine_str)
-
-            with engine.connect() as connection:
-                result = connection.execute(text(query), values)
-
-                if result.returns_rows:
-                    return [dict(row) for row in result.mappings()]
+            with self.connection.cursor() as cursor:
+                if values:
+                    cursor.execute(query, values)
                 else:
-                    connection.commit()
+                    cursor.execute(query)
+
+                if cursor.description:
+                    results = cursor.fetchall()
+                    self.connection.commit()
+                    return results
+                else:
+                    self.connection.commit()
                     return None
 
-        except Exception as e:
-            print(f"Error executing PostgreSQL query: {e}")  # changed error message
+        except psycopg2.Error as e:
+            print(f"Error executing query: {e}")
+            self.connection.rollback()
             return None
+
+    def close(self):
+        if self.connection:
+            self.connection.close()
+            self.connection = None
 
 
 if __name__ == "__main__":
-    host = "your_postgres_host"  # e.g., "localhost"
+    host = "your_postgres_host"
     user = "your_postgres_user"
     password = "your_postgres_password"
     database = "your_postgres_database"
-    port = 5432  # or the port your postgres is running on.
+    port = 5432
 
-    connection = Connection(host, user, password, database, port)  # added port
+    db = PostgresConnection(host, user, password, database, port)
 
-    query = ""
-    connection.execute(query)
+    if db.connect():
+        select_query = "SELECT * FROM example_table"
+        results = db.execute(select_query)
 
-    results = connection.execute(query)
+        if results:
+            for row in results:
+                print(row)
+        else:
+            print("No results found or an error occurred.")
 
-    if results:
-        for row in results:
-            print(row)
     else:
-        print("No results found or an error occurred.")
+        print("Failed to connect to the database.")
